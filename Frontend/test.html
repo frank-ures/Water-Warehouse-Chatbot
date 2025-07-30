@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Water Warehouse - Chatbot Widget</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <!-- Main Page Content -->
+    <div class="main-content">
+        <h1>Water Warehouse</h1>
+        <p>Welcome to our website! Click the chat button to get help with our water delivery services.</p>
+    </div>
+
+    <!-- Chatbot Button -->
+    <button class="chatbot-button" id="chatbot-toggle">
+        <svg viewBox="0 0 24 24">
+            <path d="M20 2H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h4l4 4 4-4h4c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm-2 12H6v-2h12v2zm0-3H6V9h12v2zm0-3H6V6h12v2z"/>
+        </svg>
+    </button>
+
+    <!-- Chatbot Widget -->
+    <div class="chatbot-widget" id="chatbot-widget">
+        <div class="chat-header">
+            <h3>Water Warehouse Support</h3>
+            <p>How can we help you today?</p>
+        </div>
+        
+        <div class="chatbot-messages" id="chatbot-messages">
+            <div class="message bot">
+                Hello! I'm here to help you with information about Water Warehouse! What would you like to know?
+            </div>
+        </div>
+        
+        <div class="chat-input">
+            <form class="chat-form" id="chat-form">
+                <input type="text" id="userInput" placeholder="Type your message..." autocomplete="off">
+                <button type="submit">
+                    <svg viewBox="0 0 24 24">
+                        <path d="M2,21L23,12L2,3V10L17,12L2,14V21Z"/>
+                    </svg>
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>
