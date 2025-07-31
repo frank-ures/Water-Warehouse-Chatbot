@@ -66,7 +66,7 @@ def upload_knowledge_file(client):
         return None
 
 def create_message_with_file(client, thread_id, user_input, file_id):
-    """Create message with file attachment"""
+    """Create message with file attachment"""   
     try:
         message = client.beta.threads.messages.create(
             thread_id=thread_id,
