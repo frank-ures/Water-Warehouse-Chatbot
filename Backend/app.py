@@ -22,7 +22,12 @@ else:
     print("OpenAI version is compatible")
 
 app = Flask(__name__)
-CORS(app)#origins=["https://mywaterwarehouse.com", "https://wordpress-984626-5694127.cloudwaysapps.com"])
+CORS(app,
+     origins=["https://mywaterwarehouse.com", "https://wordpress-984626-5694127.cloudwaysapps.com"],
+     methods=["GET", "POST", "OPTIONS"],
+     allow_headers=["Content-Type", "Authorization", "Accept"],
+     supports_credentials=False
+     )
  
 client = OpenAI(api_key=OPENAI_API_KEY)
 assistant_id = functions.create_assistant(client)
@@ -54,8 +59,12 @@ def start_conversation():
         print(f"Error creating thread: {e}")
         return jsonify({"error": "Failed to create conversation"}), 500
 
-@app.route('/chat', methods=['POST'])
+@app.route('/chat', methods=['POST', 'OPTIONS'])
 def chat():
+    
+    if request.method == 'OPTIONS':
+        return jsonify({}), 200
+    
     data = request.json
     thread_id = data.get('thread_id')
     user_input = data.get('message', '')
