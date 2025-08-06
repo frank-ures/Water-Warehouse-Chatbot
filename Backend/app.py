@@ -22,8 +22,8 @@ else:
     print("OpenAI version is compatible")
 
 app = Flask(__name__)
-CORS(app)
-
+CORS(app, origins=["https://mywaterwarehouse.com", "https://wordpress-984626-5694127.cloudwaysapps.com"])
+ 
 client = OpenAI(api_key=OPENAI_API_KEY)
 assistant_id = functions.create_assistant(client)
 
