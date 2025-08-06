@@ -2,6 +2,7 @@ let threadId = null;
 let isWidgetOpen = false;
 let chatbotButton, chatbotWidget, chatMessages, chatForm, userInput;
 
+const API_BASE_URL = "https://water-warehouse-chatbot.onrender.com"
 // Wait for DOM to load
 document.addEventListener('DOMContentLoaded', function() {
     // Initialize elements after DOM is loaded
