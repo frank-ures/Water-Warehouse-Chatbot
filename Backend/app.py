@@ -29,6 +29,19 @@ assistant_id = functions.create_assistant(client)
 
 # Upload knowledge file once at startup
 knowledge_file_id = functions.upload_knowledge_file(client)
+print(f"Application started with assistant ID: {assistant_id}")
+if knowledge_file_id:
+    print(f"Knowledge file loaded: {knowledge_file_id}")
+
+@app.route('/', methods=['GET'])
+def health_check():
+    """Health check endpoint for Render"""
+    return jsonify({
+        "status": "healthy",
+        "message": "Water Warehouse Chatbot API is running",
+        "assistant_id": assistant_id,
+        "knowledge_file": knowledge_file_id is not None
+    })
 
 @app.route('/start', methods=['GET'])
 def start_conversation():
@@ -78,7 +91,7 @@ def chat():
         )
         
         # Wait for completion with timeout
-        max_wait_time = 30  # 30 seconds timeout
+        max_wait_time = 60  # 30 seconds timeout
         wait_time = 0
         
         while wait_time < max_wait_time:
@@ -124,4 +137,9 @@ def chat():
         return jsonify({"error": "Internal server error"}), 500
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=8080, debug=True)
+
+    port = int(os.environ.get('PORT', 8080))
+    debug_mode = os.environ.get('FLASK_ENV') == 'development'
+
+    print(f"Starting Flask app on port {port}")
+    app.run(host='0.0.0.0', port=port, debug=debug_mode)
