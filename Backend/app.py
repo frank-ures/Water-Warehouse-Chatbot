@@ -61,7 +61,7 @@ def start_conversation():
 
 @app.route('/chat', methods=['POST', 'OPTIONS'])
 def chat():
-    
+
     if request.method == 'OPTIONS':
         return jsonify({}), 200
     
@@ -100,7 +100,7 @@ def chat():
         )
         
         # Wait for completion with timeout
-        max_wait_time = 60  # 30 seconds timeout
+        max_wait_time = 30  # 30 seconds timeout
         wait_time = 0
         
         while wait_time < max_wait_time:
