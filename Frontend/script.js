@@ -24,7 +24,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
 async function startConversation() {
     try {
-        const res = await fetch("http://localhost:8080/start");
+        const res = await fetch(`${API_BASE_URL}/start`);
         const data = await res.json();
         threadId = data.thread_id;
         console.log("Thread ID:", threadId);
@@ -79,7 +79,7 @@ function initializeEventListeners() {
         }
         
         try {
-            const response = await fetch("http://localhost:8080/chat", {
+            const response = await fetch(`${API_BASE_URL}/chat`, {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json",
