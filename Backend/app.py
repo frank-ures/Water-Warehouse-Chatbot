@@ -97,7 +97,7 @@ def chat():
         )
         
         # Wait for completion with timeout
-        max_wait_time = 60  # 60 seconds timeout
+        max_wait_time = 90  # 90 seconds timeout
         wait_time = 0
         
         while wait_time < max_wait_time:
