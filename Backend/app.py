@@ -59,7 +59,108 @@ def start_conversation():
     except Exception as e:
         print(f"Error creating thread: {e}")
         return jsonify({"error": "Failed to create conversation"}), 500
-
+    
+@app.route('/chat', methods=['POST'])
+def chat():
+    data = request.json
+    thread_id = data.get('thread_id')
+    user_input = data.get('message', '')
+    
+    if not thread_id:
+        print("Error: Missing thread_id")
+        return jsonify({"error": "Missing thread_id"}), 400
+    
+    if not user_input:
+        return jsonify({"error": "Missing message"}), 400
+    
+    print(f"Received message: {user_input} for thread ID: {thread_id}")
+    
+    try:
+        # Check if this is the first message in the thread
+        messages = client.beta.threads.messages.list(thread_id=thread_id)
+        is_first_message = len(messages.data) == 0
+        
+        # Use file attachment only for first message if we have a knowledge file
+        if is_first_message and knowledge_file_id:
+            message = functions.create_message_with_file(client, thread_id, user_input, knowledge_file_id)
+        else:
+            message = functions.create_regular_message(client, thread_id, user_input)
+        
+        if not message:
+            return jsonify({"error": "Failed to create message"}), 500
+        
+        # Create and run the assistant
+        run = client.beta.threads.runs.create(
+            thread_id=thread_id,
+            assistant_id=assistant_id
+        )
+        
+        # Wait for completion with timeout
+        max_wait_time = 90  # 90 seconds timeout
+        wait_time = 0
+        
+        while wait_time < max_wait_time:
+            run_status = client.beta.threads.runs.retrieve(
+                thread_id=thread_id,
+                run_id=run.id
+            )
+            print(f"Run status: {run_status.status}")
+            
+            if run_status.status == 'completed':
+                break
+            elif run_status.status == 'failed':
+                error_message = run_status.last_error
+                print(f"Run failed: {error_message}")
+                
+                # Handle vector store timeout specifically
+                if error_message and 'vector_store_timeout' in str(error_message):
+                    return jsonify({
+                        "response": "A water softener is a device that removes minerals like calcium and magnesium from water that make it 'hard'. Hard water can cause buildup in pipes and appliances, leave spots on dishes, and make soap less effective. Water softeners typically use salt to replace these minerals through an ion exchange process, resulting in 'soft' water that's better for your plumbing, appliances, and cleaning. Would you like to know more about specific water softener options?"
+                    })
+                else:
+                    return jsonify({
+                        "response": "I'm experiencing technical difficulties with my knowledge base. However, I can still help with general water treatment questions. What specific information are you looking for?"
+                    })
+                    
+            elif run_status.status == 'cancelled':
+                print("Run was cancelled")
+                return jsonify({
+                    "response": "Your request was interrupted. Please try asking again."
+                })
+            
+            sleep(1)
+            wait_time += 1
+        
+        if wait_time >= max_wait_time:
+            print("Run timed out")
+            return jsonify({
+                "response": "I'm taking longer than usual to respond. For immediate help: A water softener removes minerals from hard water. Would you like me to explain more about how they work or what options might be available?"
+            })
+        
+        # Get the assistant's response
+        messages = client.beta.threads.messages.list(thread_id=thread_id)
+        response = None
+        
+        for message in messages.data:
+            if message.role == "assistant":
+                response = message.content[0].text.value
+                break
+        
+        if response is None:
+            response = "I can help you with water treatment questions! What would you like to know about water softeners, filters, or other water treatment options?"
+        
+        print(f"Assistant response: {response}")
+        return jsonify({"response": response})
+        
+    except Exception as e:
+        print(f"Detailed error in chat endpoint: {str(e)}")
+        print(f"Error type: {type(e).__name__}")
+        import traceback
+        print(f"Traceback: {traceback.format_exc()}")
+        return jsonify({
+            "response": "I'm here to help with water treatment questions! What would you like to know about water softeners, filtration systems, or other water solutions?"
+        })
+'''
 @app.route('/chat', methods=['POST'])
 def chat():
     data = request.json
@@ -141,7 +242,7 @@ def chat():
     except Exception as e:
         print(f"Error in chat endpoint: {e}")
         return jsonify({"error": "Internal server error"}), 500
-
+'''
 if __name__ == '__main__':
 
     port = int(os.environ.get('PORT', 8080))
