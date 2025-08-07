@@ -11,6 +11,86 @@ def create_assistant(client):
             print("Loaded existing assistant ID.")
             return assistant_id
     
+    # Read knowledge file and embed it in the instructions
+    knowledge_content = ""
+    try:
+        if os.path.exists("knowledge.txt"):
+            with open("knowledge.txt", "r", encoding="utf-8") as f:
+                knowledge_content = f.read()
+            print("Successfully loaded knowledge.txt content")
+        else:
+            print("Warning: knowledge.txt not found")
+    except Exception as e:
+        print(f"Error reading knowledge.txt: {e}")
+    
+    # Create assistant with knowledge embedded in instructions
+    instructions = f"""
+You are the Water Warehouse Customer Support Assistant.
+You help customers with questions about Water Warehouse's products, pricing, and services.
+Keep responses short with only necessary information.
+
+Here is your knowledge base about Water Warehouse:
+
+{knowledge_content}
+
+Use this information to answer customer questions accurately. If asked about products, pricing, or services not in your knowledge base, politely say you don't have that specific information and offer to help with general water treatment guidance.
+"""
+    
+    print("Creating new assistant with embedded knowledge...")
+    assistant = client.beta.assistants.create(
+        instructions=instructions,
+        model="gpt-4-1106-preview",
+        tools=[]  # No tools - knowledge is in instructions
+    )
+    print(f"Created assistant ID: {assistant.id}")
+    
+    # Save the assistant ID
+    with open(assistant_file_path, 'w') as file:
+        json.dump({'assistant_id': assistant.id}, file)
+    print("Created a new assistant and saved the ID.")
+    
+    return assistant.id
+
+def upload_knowledge_file(client):
+    """Not needed - knowledge is embedded in assistant instructions"""
+    print("Knowledge embedded in assistant instructions - no file upload needed")
+    return None
+
+def create_message_with_file(client, thread_id, user_input, file_id):
+    """Not needed - create regular message"""
+    return create_regular_message(client, thread_id, user_input)
+
+def create_regular_message(client, thread_id, user_input):
+    """Create regular message without file attachment"""
+    try:
+        message = client.beta.threads.messages.create(
+            thread_id=thread_id,
+            role="user",
+            content=user_input
+        )
+        print("Created regular message successfully")
+        return message
+    except Exception as e:
+        print(f"Error creating regular message: {e}")
+        return None
+
+
+
+
+'''
+import json
+import os
+
+def create_assistant(client):
+    assistant_file_path = 'assistant.json'
+    
+    if os.path.exists(assistant_file_path):
+        with open(assistant_file_path, 'r') as file:
+            assistant_data = json.load(file)
+            assistant_id = assistant_data['assistant_id']
+            print("Loaded existing assistant ID.")
+            return assistant_id
+    
     # Create the assistant with file_search capability
     print("Creating new assistant with file_search capability...")
     assistant = client.beta.assistants.create(
@@ -106,6 +186,7 @@ def create_regular_message(client, thread_id, user_input):
     except Exception as e:
         print(f"Error creating regular message: {e}")
         return None
+        '''
 
 
 

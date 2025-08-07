@@ -76,15 +76,8 @@ def chat():
     print(f"Received message: {user_input} for thread ID: {thread_id}")
     
     try:
-        # Check if this is the first message in the thread
-        messages = client.beta.threads.messages.list(thread_id=thread_id)
-        is_first_message = len(messages.data) == 0
-        
-        # Use file attachment only for first message if we have a knowledge file
-        if is_first_message and knowledge_file_id:
-            message = functions.create_message_with_file(client, thread_id, user_input, knowledge_file_id)
-        else:
-            message = functions.create_regular_message(client, thread_id, user_input)
+        # Always create regular message (no file attachments)
+        message = functions.create_regular_message(client, thread_id, user_input)
         
         if not message:
             return jsonify({"error": "Failed to create message"}), 500
@@ -96,7 +89,7 @@ def chat():
         )
         
         # Wait for completion with timeout
-        max_wait_time = 90  # 90 seconds timeout
+        max_wait_time = 60  # Reduced timeout since no file processing
         wait_time = 0
         
         while wait_time < max_wait_time:
@@ -111,16 +104,9 @@ def chat():
             elif run_status.status == 'failed':
                 error_message = run_status.last_error
                 print(f"Run failed: {error_message}")
-                
-                # Handle vector store timeout specifically
-                if error_message and 'vector_store_timeout' in str(error_message):
-                    return jsonify({
-                        "response": "A water softener is a device that removes minerals like calcium and magnesium from water that make it 'hard'. Hard water can cause buildup in pipes and appliances, leave spots on dishes, and make soap less effective. Water softeners typically use salt to replace these minerals through an ion exchange process, resulting in 'soft' water that's better for your plumbing, appliances, and cleaning. Would you like to know more about specific water softener options?"
-                    })
-                else:
-                    return jsonify({
-                        "response": "I'm experiencing technical difficulties with my knowledge base. However, I can still help with general water treatment questions. What specific information are you looking for?"
-                    })
+                return jsonify({
+                    "response": "I'm experiencing technical difficulties. Please try your question again."
+                })
                     
             elif run_status.status == 'cancelled':
                 print("Run was cancelled")
@@ -134,7 +120,7 @@ def chat():
         if wait_time >= max_wait_time:
             print("Run timed out")
             return jsonify({
-                "response": "I'm taking longer than usual to respond. For immediate help: A water softener removes minerals from hard water. Would you like me to explain more about how they work or what options might be available?"
+                "response": "I'm taking longer than usual to respond. Please try asking your question again."
             })
         
         # Get the assistant's response
@@ -147,7 +133,7 @@ def chat():
                 break
         
         if response is None:
-            response = "I can help you with water treatment questions! What would you like to know about water softeners, filters, or other water treatment options?"
+            response = "I can help you with water treatment questions! What would you like to know?"
         
         print(f"Assistant response: {response}")
         return jsonify({"response": response})
@@ -158,7 +144,7 @@ def chat():
         import traceback
         print(f"Traceback: {traceback.format_exc()}")
         return jsonify({
-            "response": "I'm here to help with water treatment questions! What would you like to know about water softeners, filtration systems, or other water solutions?"
+            "response": "I'm here to help with water treatment questions! What would you like to know?"
         })
 '''
 @app.route('/chat', methods=['POST'])
