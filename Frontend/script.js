@@ -26,7 +26,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
 async function startConversation() {
     try {
-        const res = await fetch(`${API_BASE_URL}/chat`);
+        const res = await fetch(`${API_BASE_URL}/start`);
         const data = await res.json();
         threadId = data.thread_id;
         console.log("Thread ID:", threadId);
