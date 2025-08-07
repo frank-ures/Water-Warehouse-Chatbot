@@ -1,5 +1,119 @@
 import json
 import os
+
+def create_assistant(client):
+    assistant_file_path = 'assistant.json'
+    
+    if os.path.exists(assistant_file_path):
+        with open(assistant_file_path, 'r') as file:
+            assistant_data = json.load(file)
+            assistant_id = assistant_data['assistant_id']
+            print("Loaded existing assistant ID.")
+            return assistant_id
+    
+    # Create the assistant with file_search capability
+    print("Creating new assistant with file_search capability...")
+    assistant = client.beta.assistants.create(
+        instructions="""
+        You are the Water Warehouse Customer Support Assistant.
+        You have access to a knowledge base with information about Water Warehouse's products, pricing, and services.
+        Use this information to help customers with their questions.
+        Keep responses short with only necessary information.
+        If you don't have specific information, provide general helpful guidance about water filtration systems.
+        """,
+        model="gpt-4-1106-preview",
+        tools=[{"type": "file_search"}]
+    )
+    print(f"Created assistant ID: {assistant.id}")
+    
+    # Save the assistant ID
+    with open(assistant_file_path, 'w') as file:
+        json.dump({'assistant_id': assistant.id}, file)
+    print("Created a new assistant and saved the ID.")
+    
+    return assistant.id
+
+def upload_knowledge_file(client):
+    """Upload knowledge file and return file ID"""
+    knowledge_file_path = 'knowledge_file.json'
+    
+    # Check if we already have a file ID stored
+    if os.path.exists(knowledge_file_path):
+        with open(knowledge_file_path, 'r') as file:
+            file_data = json.load(file)
+            file_id = file_data['file_id']
+            print(f"Using existing knowledge file ID: {file_id}")
+            return file_id
+    
+    # Upload the knowledge file
+    try:
+        if not os.path.exists("knowledge.txt"):
+            print("Warning: knowledge.txt file not found")
+            return None
+            
+        print("Uploading knowledge.txt file...")
+        file = client.files.create(
+            file=open("knowledge.txt", "rb"),
+            purpose='assistants'
+        )
+        print(f"Uploaded knowledge file ID: {file.id}")
+        
+        # Save the file ID
+        with open(knowledge_file_path, 'w') as file_obj:
+            json.dump({'file_id': file.id}, file_obj)
+        
+        return file.id
+    except Exception as e:
+        print(f"Error uploading knowledge file: {e}")
+        return None
+
+def create_message_with_file(client, thread_id, user_input, file_id):
+    """Create message with file attachment"""
+    if not file_id:
+        print("No file_id provided, creating regular message")
+        return create_regular_message(client, thread_id, user_input)
+        
+    try:
+        print(f"Creating message with file attachment: {file_id}")
+        message = client.beta.threads.messages.create(
+            thread_id=thread_id,
+            role="user",
+            content=user_input,
+            attachments=[
+                {
+                    "file_id": file_id,
+                    "tools": [{"type": "file_search"}]
+                }
+            ]
+        )
+        print("Successfully created message with file attachment")
+        return message
+    except Exception as e:
+        print(f"Error creating message with file: {e}")
+        print("Falling back to regular message")
+        return create_regular_message(client, thread_id, user_input)
+
+def create_regular_message(client, thread_id, user_input):
+    """Create regular message without file attachment"""
+    try:
+        message = client.beta.threads.messages.create(
+            thread_id=thread_id,
+            role="user",
+            content=user_input
+        )
+        print("Created regular message successfully")
+        return message
+    except Exception as e:
+        print(f"Error creating regular message: {e}")
+        return None
+
+
+
+
+
+'''still tried to use vector stores
+import json
+import os
 import time
 
 #################################
@@ -142,6 +256,7 @@ def create_regular_message(client, thread_id, user_input):
     except Exception as e:
         print(f"Error creating regular message: {e}")
         return None
+        '''
 
 
 '''works without knowledge.txt
