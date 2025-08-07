@@ -2,7 +2,28 @@ import json
 import os
 import time
 
+#################################
+def test_vector_store_api(client):
+    """Test if vector store API is available"""
+    try:
+        # Just try to list vector stores (doesn't create anything)
+        stores = client.beta.vector_stores.list()
+        print("Vector stores API is available!")
+        return True
+    except AttributeError as e:
+        print(f"Vector stores API not available: {e}")
+        return False
+    except Exception as e:
+        print(f"Other error with vector stores: {e}")
+        return True  # API exists but other issue
+    ##########################
+
 def create_assistant(client):
+###########################
+    if not test_vector_store_api(client):
+        print("Falling back to file attachment method")
+        # Use the older method...
+##############################
     assistant_file_path = 'assistant.json'
     
     if os.path.exists(assistant_file_path):
