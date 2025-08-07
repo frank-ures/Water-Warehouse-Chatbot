@@ -1,5 +1,131 @@
 import json
 import os
+import time
+
+def create_assistant(client):
+    assistant_file_path = 'assistant.json'
+    
+    if os.path.exists(assistant_file_path):
+        with open(assistant_file_path, 'r') as file:
+            assistant_data = json.load(file)
+            assistant_id = assistant_data['assistant_id']
+            print("Loaded existing assistant ID.")
+            return assistant_id
+    
+    # Create vector store first
+    vector_store = client.beta.vector_stores.create(name="Water Warehouse Knowledge")
+    print(f"Created vector store: {vector_store.id}")
+    
+    # Upload and add file to vector store
+    try:
+        file = client.files.create(
+            file=open("knowledge.txt", "rb"),
+            purpose='assistants'
+        )
+        print(f"Uploaded file: {file.id}")
+        
+        # Add file to vector store
+        vector_store_file = client.beta.vector_stores.files.create(
+            vector_store_id=vector_store.id,
+            file_id=file.id
+        )
+        print(f"Added file to vector store")
+        
+        # Wait for file to be processed
+        print("Waiting for file processing...")
+        max_wait = 60  # 60 seconds max
+        wait_time = 0
+        
+        while wait_time < max_wait:
+            vector_store_file = client.beta.vector_stores.files.retrieve(
+                vector_store_id=vector_store.id,
+                file_id=file.id
+            )
+            
+            if vector_store_file.status == 'completed':
+                print("File processing completed!")
+                break
+            elif vector_store_file.status == 'failed':
+                print(f"File processing failed: {vector_store_file}")
+                raise Exception("File processing failed")
+            
+            time.sleep(2)
+            wait_time += 2
+        
+        if wait_time >= max_wait:
+            raise Exception("File processing timeout")
+            
+    except Exception as e:
+        print(f"Error with vector store setup: {e}")
+        # Create assistant without file search if upload fails
+        assistant = client.beta.assistants.create(
+            instructions="""
+            You are the Water Warehouse Customer Support Assistant.
+            Help customers with questions about water filtration systems, alkaline water, and related products.
+            Keep responses short and helpful.
+            """,
+            model="gpt-4-1106-preview",
+            tools=[]
+        )
+        print(f"Created assistant without vector store: {assistant.id}")
+        
+        with open(assistant_file_path, 'w') as file_obj:
+            json.dump({'assistant_id': assistant.id}, file_obj)
+        
+        return assistant.id
+    
+    # Create assistant with vector store
+    assistant = client.beta.assistants.create(
+        instructions="""
+        You are the Water Warehouse Customer Support Assistant.
+        Use the provided knowledge base to answer questions about products, pricing, and services.
+        Keep responses short with only necessary information.
+        """,
+        model="gpt-4-1106-preview",
+        tools=[{"type": "file_search"}],
+        tool_resources={
+            "file_search": {
+                "vector_store_ids": [vector_store.id]
+            }
+        }
+    )
+    
+    print(f"Created assistant with vector store: {assistant.id}")
+    
+    # Save assistant info
+    with open(assistant_file_path, 'w') as file_obj:
+        json.dump({
+            'assistant_id': assistant.id,
+            'vector_store_id': vector_store.id
+        }, file_obj)
+    
+    return assistant.id
+
+def upload_knowledge_file(client):
+    """This is now handled in create_assistant"""
+    return None
+
+def create_message_with_file(client, thread_id, user_input, file_id):
+    """Not needed with vector store setup"""
+    return create_regular_message(client, thread_id, user_input)
+
+def create_regular_message(client, thread_id, user_input):
+    """Create regular message without file attachment"""
+    try:
+        message = client.beta.threads.messages.create(
+            thread_id=thread_id,
+            role="user",
+            content=user_input
+        )
+        return message
+    except Exception as e:
+        print(f"Error creating regular message: {e}")
+        return None
+
+
+'''works without knowledge.txt
+import json
+import os
 
 def create_assistant(client):
     assistant_file_path = 'assistant.json'
@@ -53,6 +179,7 @@ def create_regular_message(client, thread_id, user_input):
     except Exception as e:
         print(f"Error creating regular message: {e}")
         return None
+        '''
 
 
 
