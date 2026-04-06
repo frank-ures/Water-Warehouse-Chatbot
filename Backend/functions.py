@@ -39,7 +39,7 @@ Use this information to answer customer questions accurately. If asked about pro
     print("Creating new assistant with embedded knowledge...")
     assistant = client.beta.assistants.create(
         instructions=instructions,
-        model="gpt-4-1106-preview",
+        model="gpt-4o",
         tools=[]  # No tools - knowledge is in instructions
     )
     print(f"Created assistant ID: {assistant.id}")
