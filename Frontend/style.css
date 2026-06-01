@@ -216,6 +216,20 @@ body {
     }
 }
 
+/* Character counter */
+.char-counter {
+    font-size: 11px;
+    color: #999;
+    text-align: right;
+    margin-top: 4px;
+    padding-right: 4px;
+}
+
+.char-counter.over-limit {
+    color: #e03e3e;
+    font-weight: 600;
+}
+
 /* Scrollbar Styling */
 .chatbot-messages::-webkit-scrollbar {
     width: 4px;

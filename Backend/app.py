@@ -1,4 +1,192 @@
+import os
+import time
+from time import sleep
+from collections import defaultdict
+from packaging import version
+from flask import Flask, request, jsonify
+import openai
+from openai import OpenAI
+import functions
+from dotenv import load_dotenv
+ 
+load_dotenv()
+from flask_cors import CORS
+ 
+# ---------------------------------------------------------------------------
+# Rate limiting configuration
+# ---------------------------------------------------------------------------
+RATE_LIMIT_MAX_REQUESTS = 15   # max requests per IP within the window
+RATE_LIMIT_WINDOW_SECONDS = 60 # rolling window in seconds
+MAX_MESSAGE_LENGTH = 500        # max characters per message
+ 
+# In-memory store: { ip: [(timestamp, ...), ...] }
+_rate_limit_store = defaultdict(list)
+ 
+def is_rate_limited(ip: str) -> bool:
+    """Return True if the IP has exceeded RATE_LIMIT_MAX_REQUESTS in the last window."""
+    now = time.time()
+    window_start = now - RATE_LIMIT_WINDOW_SECONDS
+    # Prune timestamps outside the current window
+    _rate_limit_store[ip] = [t for t in _rate_limit_store[ip] if t > window_start]
+    if len(_rate_limit_store[ip]) >= RATE_LIMIT_MAX_REQUESTS:
+        return True
+    _rate_limit_store[ip].append(now)
+    return False
+ 
+ 
+# Version check
+required_version = version.parse("1.1.1")
+current_version = version.parse(openai.__version__)
+ 
+OPENAI_API_KEY = os.environ['OPENAI_API_KEY']
+ 
+if current_version < required_version:
+    raise ValueError("Error: OpenAI version is less than required")
+else:
+    print("OpenAI version is compatible")
+ 
+app = Flask(__name__)
+CORS(app, origins=["https://mywaterwarehouse.com", "https://wordpress-984626-5694127.cloudwaysapps.com"],
+     methods=['GET', 'POST', 'OPTIONS'],
+     allow_headers=['Content-Type', 'Authorization'],
+     supports_credentials=True
+     )
+ 
+client = OpenAI(api_key=OPENAI_API_KEY)
+assistant_id = functions.create_assistant(client)
+ 
+# Upload knowledge file once at startup
+knowledge_file_id = functions.upload_knowledge_file(client)
+print(f"Application started with assistant ID: {assistant_id}")
+if knowledge_file_id:
+    print(f"Knowledge file loade: {knowledge_file_id}")
+ 
+@app.route('/', methods=['GET'])
+def health_check():
+    """Health check endpoint for Render"""
+    return jsonify({
+        "status": "healthy",
+        "message": "Water Warehouse Chatbot API is running",
+        "assistant_id": assistant_id,
+        "knowledge_file": knowledge_file_id is not None
+    })
+ 
+ 
+@app.route('/start', methods=['GET'])
+def start_conversation():
+    print("Starting a new conversation...")
+    try:
+        thread = client.beta.threads.create()
+        print(f"New thread created with ID: {thread.id}")
+        return jsonify({"thread_id": thread.id})
+    except Exception as e:
+        print(f"Error creating thread: {e}")
+        return jsonify({"error": "Failed to create conversation"}), 500
+    
+@app.route('/chat', methods=['POST'])
+def chat():
+    data = request.json
+    thread_id = data.get('thread_id')
+    user_input = data.get('message', '')
+    
+    if not thread_id:
+        print("Error: Missing thread_id")
+        return jsonify({"error": "Missing thread_id"}), 400
+    
+    if not user_input:
+        return jsonify({"error": "Missing message"}), 400
+ 
+    # Message length guard
+    if len(user_input) > MAX_MESSAGE_LENGTH:
+        return jsonify({
+            "error": f"Message too long. Please keep messages under {MAX_MESSAGE_LENGTH} characters."
+        }), 400
+ 
+    # Rate limit guard
+    client_ip = request.headers.get("X-Forwarded-For", request.remote_addr)
+    if client_ip:
+        client_ip = client_ip.split(",")[0].strip()  # handle proxy chains
+    if is_rate_limited(client_ip):
+        print(f"Rate limit exceeded for IP: {client_ip}")
+        return jsonify({
+            "error": "Too many messages. Please wait a moment before sending another."
+        }), 429
+    
+    print(f"Received message: {user_input} for thread ID: {thread_id}")
+    
+    try:
+        # Always create regular message (no file attachments)
+        message = functions.create_regular_message(client, thread_id, user_input)
+        
+        if not message:
+            return jsonify({"error": "Failed to create message"}), 500
+        
+        # Create and run the assistant
+        run = client.beta.threads.runs.create(
+            thread_id=thread_id,
+            assistant_id=assistant_id
+        )
+        
+        # Wait for completion with timeout
+        max_wait_time = 60  # Reduced timeout since no file processing
+        wait_time = 0
+        
+        while wait_time < max_wait_time:
+            run_status = client.beta.threads.runs.retrieve(
+                thread_id=thread_id,
+                run_id=run.id
+            )
+            print(f"Run status: {run_status.status}")
+            
+            if run_status.status == 'completed':
+                break
+            elif run_status.status == 'failed':
+                error_message = run_status.last_error
+                print(f"Run failed: {error_message}")
+                return jsonify({
+                    "response": "I'm experiencing technical difficulties. Please try your question again."
+                })
+                    
+            elif run_status.status == 'cancelled':
+                print("Run was cancelled")
+                return jsonify({
+                    "response": "Your request was interrupted. Please try asking again."
+                })
+            
+            sleep(1)
+            wait_time += 1
+        
+        if wait_time >= max_wait_time:
+            print("Run timed out")
+            return jsonify({
+                "response": "I'm taking longer than usual to respond. Please try asking your question again."
+            })
+        
+        # Get the assistant's response
+        messages = client.beta.threads.messages.list(thread_id=thread_id)
+        response = None
+        
+        for message in messages.data:
+            if message.role == "assistant":
+                response = message.content[0].text.value
+                break
+        
+        if response is None:
+            response = "I can help you with water treatment questions! What would you like to know?"
+        
+        print(f"Assistant response: {response}")
+        return jsonify({"response": response})
+        
+    except Exception as e:
+        print(f"Detailed error in chat endpoint: {str(e)}")
+        print(f"Error type: {type(e).__name__}")
+        import traceback
+        print(f"Traceback: {traceback.format_exc()}")
+        return jsonify({
+            "response": "I'm here to help with water treatment questions! What would you like to know?"
+        })
 
+'''
 import os
 from time import sleep
 from packaging import version
@@ -146,6 +334,9 @@ def chat():
         return jsonify({
             "response": "I'm here to help with water treatment questions! What would you like to know?"
         })
+
+'''
+
 '''
 @app.route('/chat', methods=['POST'])
 def chat():
