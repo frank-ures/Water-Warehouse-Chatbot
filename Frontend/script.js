@@ -1,4 +1,5 @@
 let threadId = null;
+let startConversationPromise = null;
 let isWidgetOpen = false;
 let chatbotButton, chatbotWidget, chatMessages, chatForm, userInput, charCounter;
  
@@ -29,14 +30,41 @@ document.addEventListener('DOMContentLoaded', function() {
 });
  
 async function startConversation() {
-    try {
+    if (threadId) return threadId;
+    if (startConversationPromise) return startConversationPromise;
+
+    startConversationPromise = (async () => {
         const res = await fetch(`${API_BASE_URL}/start`);
-        const data = await res.json();
+        const data = await parseJsonResponse(res);
+
+        if (!res.ok) {
+            throw new Error(data.error || "Failed to start conversation");
+        }
+        if (!data.thread_id) {
+            throw new Error("The server did not return a conversation ID");
+        }
+
         threadId = data.thread_id;
-        console.log("Thread ID:", threadId);
-    } catch (error) {
-        console.error("Failed to start conversation: ", error);
+        console.log("Conversation ID:", threadId);
+        return threadId;
+    })();
+
+    try {
+        return await startConversationPromise;
+    } finally {
+        startConversationPromise = null;
     }
+}
+
+async function parseJsonResponse(response) {
+    const contentType = response.headers.get("content-type") || "";
+    if (!contentType.includes("application/json")) return {};
+    return response.json();
+}
+
+function removeTypingIndicator() {
+    const typingIndicator = document.getElementById("typing-indicator");
+    if (typingIndicator) typingIndicator.remove();
 }
  
 function toggleWidget() {
@@ -47,7 +75,9 @@ function toggleWidget() {
     if (isWidgetOpen) {
         userInput.focus();
         if (!threadId) {
-            startConversation();
+            startConversation().catch(error => {
+                console.error("Failed to start conversation:", error);
+            });
         }
     }
 }
@@ -106,12 +136,10 @@ function initializeEventListeners() {
         chatMessages.appendChild(typingDiv);
         chatMessages.scrollTop = chatMessages.scrollHeight;
         
-        // Ensure we have a thread ID
-        if (!threadId) {
-            await startConversation();
-        }
-        
         try {
+            // Do not call /chat unless conversation initialization succeeded.
+            await startConversation();
+
             const response = await fetch(`${API_BASE_URL}/chat`, {
                 method: "POST",
                 headers: {
@@ -123,15 +151,11 @@ function initializeEventListeners() {
                 }),
             });
  
-            const data = await response.json();
-            
-            // Remove typing indicator
-            const typingIndicator = document.getElementById("typing-indicator");
-            if (typingIndicator) {
-                typingIndicator.remove();
-            }
- 
+            const data = await parseJsonResponse(response);
+            removeTypingIndicator();
+
             if (!response.ok) {
+                if (response.status === 404) threadId = null;
                 // Surface server-side rate limit / length errors to the user
                 appendMessage("bot", data.error || "Something went wrong. Please try again.");
             } else {
@@ -141,14 +165,8 @@ function initializeEventListeners() {
             
         } catch (error) {
             console.error(error);
-            
-            // Remove typing indicator
-            const typingIndicator = document.getElementById("typing-indicator");
-            if (typingIndicator) {
-                typingIndicator.remove();
-            }
-            
-            appendMessage("bot", "Sorry, I'm having trouble connecting. Please try again.");
+            removeTypingIndicator();
+            appendMessage("bot", "Sorry, I couldn't start the chatbot. Please try again in a moment.");
         }
     });
  
