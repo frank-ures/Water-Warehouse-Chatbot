@@ -2,6 +2,7 @@ import unittest
 from unittest.mock import patch
 
 import app as chatbot_app
+import functions
 
 
 class ChatbotApiTests(unittest.TestCase):
@@ -82,6 +83,23 @@ class ChatbotApiTests(unittest.TestCase):
         )
         self.assertEqual(response.status_code, 502)
         self.assertNotIn("upstream failed", response.get_json()["error"])
+
+
+class InstructionTests(unittest.TestCase):
+    def test_business_hours_are_authoritative_and_include_sunday(self):
+        instructions = functions.build_instructions(
+            "Monday Hours: 9am to 6pm\nSunday Hours: 9am to 6pm"
+        )
+
+        self.assertIn("Sunday Hours: 9am to 6pm", instructions)
+        self.assertIn('daily "Hours:" entry', instructions)
+        self.assertIn("must not omit Sunday", instructions)
+        self.assertIn('explicitly labels it "Closed."', instructions)
+
+    def test_deployed_knowledge_lists_sunday_as_open(self):
+        knowledge = functions.load_knowledge()
+
+        self.assertIn("Sunday Hours: 9am to 6pm", knowledge)
 
 
 if __name__ == "__main__":
